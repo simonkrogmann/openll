@@ -125,13 +125,15 @@ void glInitialize()
 
 std::string random_name(std::default_random_engine engine)
 {
-    std::uniform_int_distribution<int> charDistribution(32, 126);
-    std::uniform_int_distribution<int> lengthDistribution(3, 15);
+    std::uniform_int_distribution<int> upperDistribution(65, 90);
+    std::uniform_int_distribution<int> lowerDistribution(97, 122);
+    std::uniform_int_distribution<int> lengthDistribution(3, 14);
     const auto length = lengthDistribution(engine);
     std::vector<char> characters;
+    characters.push_back(static_cast<char>(upperDistribution(engine)));
     for (int i = 0; i < length; ++i)
     {
-        characters.push_back(static_cast<char>(charDistribution(engine)));
+        characters.push_back(static_cast<char>(lowerDistribution(engine)));
     }
     return {characters.begin(), characters.end()};
 }
