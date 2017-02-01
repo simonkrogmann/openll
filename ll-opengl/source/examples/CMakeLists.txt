@@ -5,9 +5,9 @@ if(NOT OPTION_BUILD_EXAMPLES)
 endif()
 
 
-# 
+#
 # Configuration for all sub-projects
-# 
+#
 
 # External packages
 find_package(cpplocate)
@@ -18,9 +18,9 @@ if (NOT cpplocate_FOUND)
 endif()
 
 
-# 
+#
 # Module information file
-# 
+#
 
 generate_module_info(${META_PROJECT_NAME}
     VALUES
@@ -53,5 +53,6 @@ add_subdirectory(minimal-label) # new example (template)
 
 # ToDo: port to new projects above ...
 add_subdirectory(pointbasedlayouting) # ...
+add_subdirectory(pbl-bench) # ...
 add_subdirectory(text-example) # basic-text-display
 # add_subdirectory(point-based-example) # labeling-at-point # done

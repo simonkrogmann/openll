@@ -51,15 +51,14 @@ using namespace std::placeholders;
 
 std::vector<Algorithm> layoutAlgorithms
 {
-    {"constant",                          gloperate_text::layout::constant},
-    {"random",                            gloperate_text::layout::random},
-    {"greedy with area",                  std::bind(gloperate_text::layout::greedy, _1, gloperate_text::layout::overlapArea)},
-    {"discreteGradientDescent with area", std::bind(gloperate_text::layout::discreteGradientDescent, _1, gloperate_text::layout::overlapArea)},
-    {"simulatedAnnealing with area",      std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::overlapArea, false, glm::vec2(0.f))},
-    {"simulatedAnnealing",                std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.f))},
-    {"simulatedAnnealing with padding",   std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.2f))},
-    {"simulatedAnnealing with selection", std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, true, glm::vec2(0.f))},
-    {"simulatedAnnealing (everything)",   std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, true, glm::vec2(0.2f))},
+    {"Constant",                          gloperate_text::layout::constant},
+    {"Random",                            gloperate_text::layout::random},
+    {"Greedy",                  std::bind(gloperate_text::layout::greedy, _1, gloperate_text::layout::standard)},
+    {"Discrete Gradient Descent", std::bind(gloperate_text::layout::discreteGradientDescent, _1, gloperate_text::layout::standard)},
+    {"Simulated Annealing",                std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.f))},
+    {"Simulated Annealing with padding",   std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.2f))},
+    {"Simulated Annealing with selection", std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, true, glm::vec2(0.f))},
+    {"Simulated Annealing (padding, selection)",   std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, true, glm::vec2(0.2f))},
 };
 
 void onResize(GLFWwindow*, int width, int height)
@@ -138,19 +137,29 @@ std::string random_name(std::default_random_engine engine)
     return {characters.begin(), characters.end()};
 }
 
-std::vector<gloperate_text::Label> prepareLabels(gloperate_text::FontFace * font, glm::uvec2 viewport)
+std::vector<gloperate_text::Label> prepareLabels(gloperate_text::FontFace * font, glm::uvec2 viewport, std::string name)
 {
     std::vector<gloperate_text::Label> labels;
 
     std::default_random_engine generator;
     generator.seed(g_seed);
-    std::uniform_real_distribution<float> distribution(-1.f, 1.f);
+    std::uniform_real_distribution<float> y_distribution(-.8f, .6f);
+    std::uniform_real_distribution<float> x_distribution(-.8f, .8f);
     std::uniform_int_distribution<unsigned int> priorityDistribution(1, 10);
 
     for (int i = 0; i < g_numLabels; ++i)
     {
-        const auto string = random_name(generator);
-        const auto priority = priorityDistribution(generator);
+        auto string = random_name(generator);
+        auto priority = priorityDistribution(generator);
+        auto origin = glm::vec2{x_distribution(generator), y_distribution(generator)};
+
+        if (i == 0)
+        {
+            string = name;
+            priority = 200;
+            origin = {-0.9f, 0.7f};
+        }
+
         gloperate_text::GlyphSequence sequence;
         std::u32string unicode_string(string.begin(), string.end());
         sequence.setString(unicode_string);
@@ -163,7 +172,13 @@ std::vector<gloperate_text::Label> prepareLabels(gloperate_text::FontFace * font
         sequence.setFontColor(glm::vec4(glm::vec3(0.5f - priority * 0.05f), 1.f));
         sequence.setSuperSampling(gloperate_text::SuperSampling::Quincunx);
 
-        const auto origin = glm::vec2{distribution(generator), distribution(generator)};
+        if (i == 0)
+        {
+            sequence.setFontSize(30.f);
+            sequence.setFontColor(glm::vec4(0.4f, 0.4f, 1.0f, 1.f));
+            sequence.setLineWidth(800.f);
+        }
+
         // compute  transform matrix
         glm::mat4 transform;
         transform = glm::translate(transform, glm::vec3(origin, 0.f));
@@ -196,8 +211,10 @@ gloperate_text::GlyphVertexCloud prepareCloud(const std::vector<gloperate_text::
 void preparePointDrawable(const std::vector<gloperate_text::Label> & labels, PointDrawable& pointDrawable)
 {
     std::vector<Point> points;
+    int i = 0;
     for (const auto & label : labels)
     {
+        if (!i++) continue;
         points.push_back({
             label.pointLocation,
             label.placement.display ? glm::vec3(.7f, .0f, .0f) : glm::vec3(.5f, .5f, .5f),
@@ -210,8 +227,10 @@ void preparePointDrawable(const std::vector<gloperate_text::Label> & labels, Poi
 void prepareRectangleDrawable(const std::vector<gloperate_text::Label> & labels, RectangleDrawable& rectangleDrawable)
 {
     std::vector<glm::vec2> rectangles;
+    int i = 0;
     for (const auto & label : labels)
     {
+        if (!i++) continue;
         auto sequence = gloperate_text::applyPlacement(label);
         auto extent = gloperate_text::Typesetter::rectangle(sequence, glm::vec3(label.pointLocation, 0.f));
         rectangles.push_back(extent.first);
@@ -282,8 +301,9 @@ int main()
         if (g_config_changed)
         {
             glViewport(0, 0, g_viewport.x, g_viewport.y);
-            labels = prepareLabels(font, g_viewport);
+            labels = prepareLabels(font, g_viewport, layoutAlgorithms[g_algorithmID].name);
             runAndBenchmark(labels, layoutAlgorithms[g_algorithmID]);
+            labels[0].placement.offset = {0.f, 0.f};
             cloud = prepareCloud(labels);
             preparePointDrawable(labels, pointDrawable);
             prepareRectangleDrawable(labels, rectangleDrawable);
