@@ -77,7 +77,7 @@ FontLoader::FontLoader()
 {
 }
 
-FontFace * FontLoader::load(const std::string & filename, bool nogl) const
+FontFace * FontLoader::load(const std::string & filename, bool headless) const
 {
     std::ifstream in(filename, std::ios::in | std::ios::binary);
 
@@ -109,7 +109,7 @@ FontFace * FontLoader::load(const std::string & filename, bool nogl) const
         {
             handleCommon(ss, *fontFace);
         }
-        else if (identifier == "page" && !nogl)
+        else if (identifier == "page" && !headless)
         {
             handlePage(ss, *fontFace, filename);
         }
@@ -123,7 +123,7 @@ FontFace * FontLoader::load(const std::string & filename, bool nogl) const
         }
     }
 
-    if (nogl || fontFace->glyphTexture())
+    if (headless || fontFace->glyphTexture())
         return fontFace;
 
     delete fontFace;

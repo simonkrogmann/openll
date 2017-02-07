@@ -51,14 +51,14 @@ using namespace std::placeholders;
 
 std::vector<Algorithm> layoutAlgorithms
 {
-    {"Constant",                          gloperate_text::layout::constant},
-    {"Random",                            gloperate_text::layout::random},
-    {"Greedy",                  std::bind(gloperate_text::layout::greedy, _1, gloperate_text::layout::standard)},
-    {"Discrete Gradient Descent", std::bind(gloperate_text::layout::discreteGradientDescent, _1, gloperate_text::layout::standard)},
-    {"Simulated Annealing",                std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.f))},
-    {"Simulated Annealing with padding",   std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.2f))},
-    {"Simulated Annealing with selection", std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, true, glm::vec2(0.f))},
-    {"Simulated Annealing (padding, selection)",   std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, true, glm::vec2(0.2f))},
+    {"Constant",                                 gloperate_text::layout::constant},
+    {"Random",                                   gloperate_text::layout::random},
+    {"Greedy",                                   std::bind(gloperate_text::layout::greedy, _1, gloperate_text::layout::standard)},
+    {"Discrete Gradient Descent with area",      std::bind(gloperate_text::layout::discreteGradientDescent, _1, gloperate_text::layout::standard)},
+    {"Simulated Annealing",                      std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.f))},
+    {"Simulated Annealing with padding",         std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.2f))},
+    {"Simulated Annealing with selection",       std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, true, glm::vec2(0.f))},
+    {"Simulated Annealing (padding, selection)", std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, true, glm::vec2(0.2f))},
 };
 
 void onResize(GLFWwindow*, int width, int height)
@@ -137,7 +137,7 @@ std::string random_name(std::default_random_engine engine)
     return {characters.begin(), characters.end()};
 }
 
-std::vector<gloperate_text::Label> prepareLabels(gloperate_text::FontFace * font, glm::uvec2 viewport, std::string name)
+std::vector<gloperate_text::Label> prepareLabels(gloperate_text::FontFace * font, glm::uvec2 viewport)
 {
     std::vector<gloperate_text::Label> labels;
 
@@ -149,19 +149,12 @@ std::vector<gloperate_text::Label> prepareLabels(gloperate_text::FontFace * font
 
     for (int i = 0; i < g_numLabels; ++i)
     {
-        auto string = random_name(generator);
-        auto priority = priorityDistribution(generator);
-        auto origin = glm::vec2{x_distribution(generator), y_distribution(generator)};
-
-        if (i == 0)
-        {
-            string = name;
-            priority = 200;
-            origin = {-0.9f, 0.7f};
-        }
+        const auto string = random_name(generator);
+        const std::u32string unicode_string {string.begin(), string.end()};
+        const auto priority = priorityDistribution(generator);
+        const auto origin = glm::vec2{x_distribution(generator), y_distribution(generator)};
 
         gloperate_text::GlyphSequence sequence;
-        std::u32string unicode_string(string.begin(), string.end());
         sequence.setString(unicode_string);
         sequence.setWordWrap(true);
         sequence.setLineWidth(400.f);
@@ -171,13 +164,6 @@ std::vector<gloperate_text::Label> prepareLabels(gloperate_text::FontFace * font
         sequence.setFontFace(font);
         sequence.setFontColor(glm::vec4(glm::vec3(0.5f - priority * 0.05f), 1.f));
         sequence.setSuperSampling(gloperate_text::SuperSampling::Quincunx);
-
-        if (i == 0)
-        {
-            sequence.setFontSize(30.f);
-            sequence.setFontColor(glm::vec4(0.4f, 0.4f, 1.0f, 1.f));
-            sequence.setLineWidth(800.f);
-        }
 
         // compute  transform matrix
         glm::mat4 transform;
@@ -195,7 +181,36 @@ std::vector<gloperate_text::Label> prepareLabels(gloperate_text::FontFace * font
     return labels;
 }
 
-gloperate_text::GlyphVertexCloud prepareCloud(const std::vector<gloperate_text::Label> & labels)
+
+gloperate_text::GlyphSequence prepareHeadline(gloperate_text::FontFace * font, glm::uvec2 viewport, const std::string & name)
+{
+
+    const std::u32string unicode_string {name.begin(), name.end()};
+    const auto origin = glm::vec2{-0.9f, 0.75f};
+
+    gloperate_text::GlyphSequence sequence;
+    sequence.setString(unicode_string);
+    sequence.setWordWrap(false);
+    sequence.setLineWidth(800.f);
+    sequence.setAlignment(gloperate_text::Alignment::LeftAligned);
+    sequence.setLineAnchor(gloperate_text::LineAnchor::Descent);
+    sequence.setFontSize(30.f);
+    sequence.setFontFace(font);
+    sequence.setFontColor(glm::vec4(0.4f, 0.4f, 1.0f, 1.f));
+
+    // compute  transform matrix
+    glm::mat4 transform;
+    transform = glm::translate(transform, glm::vec3(origin, 0.f));
+    transform = glm::scale(transform, glm::vec3(1.f,
+        static_cast<float>(viewport.x) / viewport.y, 1.f));
+    transform = glm::scale(transform, glm::vec3(1 / 300.f));
+
+    sequence.setAdditionalTransform(transform);
+
+    return sequence;
+}
+
+std::vector<gloperate_text::GlyphSequence> getSequences(const std::vector<gloperate_text::Label> & labels)
 {
     std::vector<gloperate_text::GlyphSequence> sequences;
     for (const auto & label : labels)
@@ -205,16 +220,14 @@ gloperate_text::GlyphVertexCloud prepareCloud(const std::vector<gloperate_text::
             sequences.push_back(gloperate_text::applyPlacement(label));
         }
     }
-    return gloperate_text::prepareGlyphs(sequences, true);
+    return sequences;
 }
 
 void preparePointDrawable(const std::vector<gloperate_text::Label> & labels, PointDrawable& pointDrawable)
 {
     std::vector<Point> points;
-    int i = 0;
     for (const auto & label : labels)
     {
-        if (!i++) continue;
         points.push_back({
             label.pointLocation,
             label.placement.display ? glm::vec3(.7f, .0f, .0f) : glm::vec3(.5f, .5f, .5f),
@@ -227,10 +240,8 @@ void preparePointDrawable(const std::vector<gloperate_text::Label> & labels, Poi
 void prepareRectangleDrawable(const std::vector<gloperate_text::Label> & labels, RectangleDrawable& rectangleDrawable)
 {
     std::vector<glm::vec2> rectangles;
-    int i = 0;
     for (const auto & label : labels)
     {
-        if (!i++) continue;
         auto sequence = gloperate_text::applyPlacement(label);
         auto extent = gloperate_text::Typesetter::rectangle(sequence, glm::vec3(label.pointLocation, 0.f));
         rectangles.push_back(extent.first);
@@ -287,7 +298,7 @@ int main()
     std::string dataPath = moduleInfo.value("dataPath");
 
     gloperate_text::FontLoader loader;
-    auto font = loader.load(dataPath + "/fonts/opensansr36/opensansr36.fnt");
+    const auto font = loader.load(dataPath + "/fonts/opensansr36/opensansr36.fnt");
     gloperate_text::GlyphRenderer renderer;
     gloperate_text::GlyphVertexCloud cloud;
     std::vector<gloperate_text::Label> labels;
@@ -301,10 +312,11 @@ int main()
         if (g_config_changed)
         {
             glViewport(0, 0, g_viewport.x, g_viewport.y);
-            labels = prepareLabels(font, g_viewport, layoutAlgorithms[g_algorithmID].name);
+            labels = prepareLabels(font, g_viewport);
             runAndBenchmark(labels, layoutAlgorithms[g_algorithmID]);
-            labels[0].placement.offset = {0.f, 0.f};
-            cloud = prepareCloud(labels);
+            auto sequences = getSequences(labels);
+            sequences.push_back(prepareHeadline(font, g_viewport, layoutAlgorithms[g_algorithmID].name));
+            cloud = gloperate_text::prepareGlyphs(sequences, true);
             preparePointDrawable(labels, pointDrawable);
             prepareRectangleDrawable(labels, rectangleDrawable);
         }
