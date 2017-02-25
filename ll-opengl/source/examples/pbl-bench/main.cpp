@@ -10,7 +10,6 @@
 #include <openll/GlyphRenderer.h>
 #include <openll/FontLoader.h>
 #include <openll/Typesetter.h>
-#include <openll/stages/GlyphPreparationStage.h>
 
 #include <openll/FontFace.h>
 #include <openll/GlyphSequence.h>
@@ -39,15 +38,15 @@ using namespace std::placeholders;
 
 std::vector<Algorithm> layoutAlgorithms
 {
-    //{"constant",                          gloperate_text::layout::constant},
-    {"random",                            gloperate_text::layout::random},
-    {"greedyArea",                  std::bind(gloperate_text::layout::greedy, _1, gloperate_text::layout::standard)},
-    {"discreteGradientDescentArea", std::bind(gloperate_text::layout::discreteGradientDescent, _1, gloperate_text::layout::standard)},
-    //{"simulatedAnnealingArea",      std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::overlapArea, false, glm::vec2(0.f))},
-    //{"simulatedAnnealing",                std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.f))},
-    //{"simulatedAnnealingPadding",   std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.2f))},
-    {"simulatedAnnealingSelection", std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.f))},
-    //{"simulatedAnnealingEverything",   std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, true, glm::vec2(0.2f))},
+    //{"constant",                  gloperate_text::layout::constant},
+    {"Random",                    gloperate_text::layout::random},
+    {"Greedy",                    std::bind(gloperate_text::layout::greedy, _1, gloperate_text::layout::standard, glm::vec2(0.2f))},
+    {"Discrete Gradient Descent", std::bind(gloperate_text::layout::discreteGradientDescent, _1, gloperate_text::layout::standard, glm::vec2(0.2f))},
+    //{"simulatedAnnealingArea",    std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::overlapArea, false, glm::vec2(0.f))},
+    //{"simulatedAnnealing",        std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.f))},
+    //{"simulatedAnnealingPadding", std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, false, glm::vec2(0.2f))},
+    {"Simulated Annealing",       std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, glm::vec2(0.2f))},
+    //{"simulatedAnnealingEverything", std::bind(gloperate_text::layout::simulatedAnnealing, _1, gloperate_text::layout::standard, true, glm::vec2(0.2f))},
 };
 
 
@@ -108,32 +107,36 @@ std::vector<gloperate_text::Label> prepareLabels(gloperate_text::FontFace * font
     return labels;
 }
 
-void runAndBenchmark(std::vector<gloperate_text::Label> & labels, Algorithm algorithm)
+float runAndBenchmark(std::vector<gloperate_text::Label> & labels, Algorithm algorithm, const std::string & mode)
 {
     auto start = std::chrono::steady_clock::now();
     algorithm.function(labels);
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> diff = end - start;
     auto positions = labelPositionDesirability(labels);
-    std::cout
+    if (mode == "performance")
+        return diff.count();
+    else if (mode == "score")
+        return labelPenalty(labels, gloperate_text::layout::standard);
         //<< algorithm.name
-        <<", "<< diff.count();
-        //<<", "<< labelPenalty(labels, gloperate_text::layout::standard);
-        /*<<", "<< labelsHidden(labels)
-        <<", "<< labelOverlaps(labels)
-        <<", "<< labelOverlapArea(labels)
-        <<", "<< labelOverlaps(labels, {0.2f, 0.2f})
-        <<", "<< labelOverlapArea(labels, {0.2f, 0.2f})
-        <<", "<< positions[gloperate_text::RelativeLabelPosition::UpperRight]
-        <<", "<< positions[gloperate_text::RelativeLabelPosition::UpperLeft]
-        <<", "<< positions[gloperate_text::RelativeLabelPosition::LowerLeft]
-        <<", "<< positions[gloperate_text::RelativeLabelPosition::LowerRight]*/
+        /*<<","<< labelsHidden(labels)
+        <<","<< labelOverlaps(labels)
+        <<","<< labelOverlapArea(labels)
+        <<","<< labelOverlaps(labels, {0.2f, 0.2f})
+        <<","<< labelOverlapArea(labels, {0.2f, 0.2f})
+        <<","<< positions[gloperate_text::RelativeLabelPosition::UpperRight]
+        <<","<< positions[gloperate_text::RelativeLabelPosition::UpperLeft]
+        <<","<< positions[gloperate_text::RelativeLabelPosition::LowerLeft]
+        <<","<< positions[gloperate_text::RelativeLabelPosition::LowerRight]*/
         //<< std::endl;
+    return 0.f;
 }
 
 
-int main()
+int main(int argc, char * argv[])
 {
+    assert(argc == 2);
+    std::string mode = argv[1];
     cpplocate::ModuleInfo moduleInfo = cpplocate::findModule("openll");
     std::string dataPath = moduleInfo.value("dataPath");
 
@@ -141,13 +144,25 @@ int main()
     auto font = loader.load(dataPath + "/fonts/opensansr36/opensansr36.fnt", true);
     std::vector<gloperate_text::Label> labels;
 
-    for (int i = 10; i < 500; i += 10)
+    for (const auto & algo : layoutAlgorithms)
+    {
+        std::cout << "," << algo.name;
+    }
+    std::cout << std::endl;
+    for (int i = 10; i < 501; i += 10)
     {
         std::cout << i;
         for (const auto & algo : layoutAlgorithms)
         {
-            labels = prepareLabels(font, {640.f, 480.f}, i);
-            runAndBenchmark(labels, algo);
+            float sum = 0.f;
+            const int runs = 10;
+            for (int j = 0; j < runs; ++j)
+            {
+                g_seed = j;
+                labels = prepareLabels(font, {640.f, 480.f}, i);
+                sum += runAndBenchmark(labels, algo, mode);
+            }
+            std::cout << "," << (sum / runs);
         }
         std::cout << std::endl;
     }

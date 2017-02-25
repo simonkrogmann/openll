@@ -15,10 +15,12 @@ std::vector<gloperate_text::LabelArea> computeLabelAreas(const std::vector<glope
     std::vector<gloperate_text::LabelArea> areas;
     for (const auto& label : labels)
     {
-        if (!label.placement.display) continue;
         auto origin = label.pointLocation + label.placement.offset;
         auto extent = gloperate_text::Typesetter::extent(label.sequence);
-        areas.push_back({origin, extent});
+        const auto position = label.placement.display ?
+            gloperate_text::relativeLabelPosition(label.placement.offset, extent) :
+            gloperate_text::RelativeLabelPosition::Hidden;
+        areas.push_back({origin, extent, position});
     }
     return areas;
 }
@@ -75,11 +77,7 @@ float labelPenalty(const std::vector<gloperate_text::Label> & labels, gloperate_
             }
         }
         area /= areas[i].area();
-        const auto extent = gloperate_text::Typesetter::extent(labels[i].sequence);
-        const auto position = labels[i].placement.display ?
-            gloperate_text::relativeLabelPosition(labels[i].placement.offset, extent) :
-            gloperate_text::RelativeLabelPosition::Hidden;
-        auto score = penaltyFunction(counter, area, position, labels[i].priority);
+        auto score = penaltyFunction(counter, area, areas[i].position, labels[i].priority);
         sum += score;
     }
     return sum;
