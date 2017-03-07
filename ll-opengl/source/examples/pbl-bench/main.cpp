@@ -23,6 +23,7 @@
 #include <cpplocate/ModuleInfo.h>
 
 #include "benchmark.h"
+#include "GeoData.h"
 
 using namespace gl;
 
@@ -33,6 +34,10 @@ struct Algorithm
     std::string name;
     std::function<void(std::vector<gloperate_text::Label>&)> function;
 };
+
+glm::vec2 g_lowerLeftCoords  {-12.f, 35.f};
+glm::vec2 g_upperRightCoords {30.f, 72.f};
+GeoData airports;
 
 using namespace std::placeholders;
 
@@ -73,24 +78,26 @@ std::vector<gloperate_text::Label> prepareLabels(gloperate_text::FontFace * font
     generator.seed(g_seed);
     std::uniform_real_distribution<float> distribution(-1.f, 1.f);
     std::uniform_int_distribution<unsigned int> priorityDistribution(1, 10);
+    auto airportsInArea = airports.featuresInArea(g_lowerLeftCoords, g_upperRightCoords);
 
     for (int i = 0; i < numLabels; ++i)
     {
-        const auto string = random_name(generator);
-        const auto priority = priorityDistribution(generator);
+        const auto string = airportsInArea.at(i).name;
+        const std::u32string unicode_string {string.begin(), string.end()};
+        //std::cout << string << std::endl;
+        const unsigned int priority = airportsInArea.at(i).additional / 50000;
+        //std::cout << priority << std::endl;
+        const auto origin = airportsInArea.at(i).location;
+
         gloperate_text::GlyphSequence sequence;
-        std::u32string unicode_string(string.begin(), string.end());
         sequence.setString(unicode_string);
         sequence.setWordWrap(true);
         sequence.setLineWidth(400.f);
         sequence.setAlignment(gloperate_text::Alignment::LeftAligned);
         sequence.setLineAnchor(gloperate_text::LineAnchor::Ascent);
-        sequence.setFontSize(10.f + priority);
+        sequence.setFontSize(10.f + priority * .05f);
         sequence.setFontFace(font);
-        sequence.setFontColor(glm::vec4(glm::vec3(0.5f - priority * 0.05f), 1.f));
-        sequence.setSuperSampling(gloperate_text::SuperSampling::Quincunx);
 
-        const auto origin = glm::vec2{distribution(generator), distribution(generator)};
         // compute  transform matrix
         glm::mat4 transform;
         transform = glm::translate(transform, glm::vec3(origin, 0.f));
@@ -141,6 +148,7 @@ int main(int argc, char * argv[])
     std::string dataPath = moduleInfo.value("dataPath");
 
     gloperate_text::FontLoader loader;
+    airports.loadCSV("/home/simon/Documents/infovis/2015_Uebung3_v2/data/simplemaps-worldcities-basic.csv", 1, 3, 2, 4);
     auto font = loader.load(dataPath + "/fonts/opensansr36/opensansr36.fnt", true);
     std::vector<gloperate_text::Label> labels;
 
@@ -155,7 +163,7 @@ int main(int argc, char * argv[])
         for (const auto & algo : layoutAlgorithms)
         {
             float sum = 0.f;
-            const int runs = 10;
+            const int runs = 1;
             for (int j = 0; j < runs; ++j)
             {
                 g_seed = j;

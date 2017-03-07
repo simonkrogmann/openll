@@ -29,6 +29,8 @@ set(sources
     main.cpp
     benchmark.cpp
     benchmark.h
+    GeoData.cpp
+    GeoData.h
 )
 
 
